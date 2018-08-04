@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+##############################################################################################################
+########################################## DATA PREPROCESSING ################################################
+##############################################################################################################
 import pandas as pd
 # Load dataset
-dataset_train = pd.read_csv('train.csv', nrows=1000)
+dataset_train = pd.read_csv('dataset_sample/dataset_sample.csv', nrows=1000)
 # Remove useless columns
 dataset_train = dataset_train.drop('key', 1)
 # Remove 0 coords
@@ -15,7 +18,6 @@ dataset_train['pickup_point']  = dataset_train[['pickup_latitude', 'pickup_longi
                                                 lambda coords: (coords[0],coords[1]), axis=1)
 dataset_train['dropoff_point'] = dataset_train[['dropoff_latitude', 'dropoff_longitude']].apply(
                                                 lambda coords: (coords[0],coords[1]), axis=1)
-
 # Remove coords
 dataset_train = dataset_train.drop(['dropoff_longitude',
                                     'dropoff_latitude' ,
@@ -48,48 +50,31 @@ dataset_train = dataset_train.drop(['pickup_point',
                                     'dropoff_point'] , axis=1)
 # Remove 0 distances ???
 
-# Discretize time
+# Convert "dates" in to dates
 from datetime import datetime as dt
 dataset_train['pickup_datetime'] = dataset_train['pickup_datetime'].apply(
                                                 lambda date: dt.strptime(date[:19],'%Y-%m-%d %H:%M:%S'))
+# Split dates in columns
+dataset_train['pickup_year'] = dataset_train['pickup_datetime'].apply(
+                                                lambda date: date.year)
+dataset_train['pickup_month'] = dataset_train['pickup_datetime'].apply(
+                                                lambda date: date.month)
+dataset_train['pickup_hour'] = dataset_train['pickup_datetime'].apply(
+                                                lambda date: date.hour)
+# Remove dates
+dataset_train = dataset_train.drop(['pickup_datetime'] , axis=1)
+# Get data
+X = dataset_train.iloc[:,1:6].values
+y = dataset_train.iloc[:,:1].values
+# Splitting the dataset into the Training set and Test set
+from sklearn.model_selection import train_test_split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
+# Feature Scaling
+from sklearn.preprocessing import StandardScaler
+sc = StandardScaler()
+X_train = sc.fit_transform(X_train)
+X_test  = sc.transform(X_test)
+##############################################################################################################
+############################################### CREATING THE MODEL ###########################################
+##############################################################################################################
 
-dataset_train['pickup_datetime'] = dataset_train[dataset_train['pickup_datetime']]
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - 
-from geopy.distance import vincenty
-def get_distance(row): 
-    p1 = (row['pickup_longitude'])
-
-# Display data
-import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-plot = dataset_test.iloc[:].plot.scatter('abs_diff_longitude', 'abs_diff_latitude')
-
-dataset_test = dataset_test[dataset_test['abs_diff_longitude']<0.4]
-dataset_test = dataset_test[dataset_test['abs_diff_latitude']<0.4]
-fig = plt.figure()
-ax = fig.add_subplot(111, projection='3d')
-ax.scatter(dataset_test['abs_diff_longitude'], dataset_test['abs_diff_latitude'], dataset_test['fare_amount'])
-plt.show()
-
-mean = dataset_test['fare_amount'].mean()
-
-
-
-
-
-
-
-
-# Utils
-def remove_noise(dataset, colum_name, noise_value):
-    return dataset_test[dataset_test[colum_name]!=noise_value]
-def add_distance_vector_features(dataFrame):
-    dataFrame['abs_diff_longitude'] = (dataFrame.dropoff_longitude - dataFrame.pickup_longitude).abs()
-    dataFrame['abs_diff_latitude']  = (dataFrame.dropoff_latitude  - dataFrame.pickup_latitude ).abs()
-add_distance_vector_features(dataset_test)
-
-#remove abs sum 0
-dataset_train = dataset_train[dataset_train.dropoff_longitude.abs()+
-                             dataset_train.dropoff_latitude.abs() +
-                             dataset_train.pickup_longitude.abs() +
-                             dataset_train.pickup_latitude.abs()  !=0]
