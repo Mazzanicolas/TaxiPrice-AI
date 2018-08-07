@@ -2,7 +2,7 @@
 ########################################## DATA PREPROCESSING ################################################
 import pandas as pd
 # Load dataset
-dataset_train = pd.read_csv('dataset_sample/train.csv', nrows=10000)
+dataset_train = pd.read_csv('dataset_sample/train.csv', nrows=100000)
 # Remove useless columns
 dataset_train = dataset_train.drop('key', 1)
 # Remove 0 coords
@@ -53,26 +53,24 @@ dataset_train['manhattan_distance'] = dataset_train[['pickup_point', 'dropoff_po
                                                 lambda coords: manhattan_distance(coords[0],coords[1]), axis=1)
 # Remove points
 dataset_train = dataset_train.drop(['pickup_point',
-                                    'dropoff_point'] , axis=1)
-# Remove 0 distances ???
-
+                                    'dropoff_point',
+                                    'passenger_count'] , axis=1)
+dataset_train['manhattan_distance']  = dataset_train['manhattan_distance'].apply(
+                                                lambda distance: round(distance))
 # Convert "dates" in to dates
 from datetime import datetime as dt
 dataset_train['pickup_datetime'] = dataset_train['pickup_datetime'].apply(
                                                 lambda date: dt.strptime(date[:19],'%Y-%m-%d %H:%M:%S'))
 # Split dates in columns
-dataset_train['pickup_year']  = dataset_train['pickup_datetime'].apply(
-                                                lambda date: date.year)
-dataset_train['pickup_month'] = dataset_train['pickup_datetime'].apply(
-                                                lambda date: date.month)
 dataset_train['pickup_hour']  = dataset_train['pickup_datetime'].apply(
                                                 lambda date: date.hour)
 # Remove dates
 dataset_train = dataset_train.drop(['pickup_datetime'] , axis=1)
 # Get data
-X = dataset_train.iloc[:,1:6].values
-y = dataset_train.iloc[:,:1].values
 # Splitting the dataset into the Training set and Test set
+X = dataset_train.iloc[:,1:].values
+y = dataset_train.iloc[:,:1].values
+
 from sklearn.model_selection import train_test_split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 0)
 # Feature Scaling
@@ -88,22 +86,32 @@ from   keras.layers import Dropout
 # Initialising the ANN
 def model(x_size, y_size):
     model = Sequential()
-    model.add(Dense(100, activation="tanh", input_shape=(x_size,)))
+    model.add(Dense(20, activation="tanh", input_shape=(x_size,)))
     model.add(Dropout(0.2))
-    model.add(Dense(200, activation="relu"))
+    model.add(Dense(30, activation="relu"))
     model.add(Dropout(0.2))
-    model.add(Dense(100, activation="softsign"))
+    model.add(Dense(30, activation="relu"))
+    model.add(Dropout(0.2))
+    model.add(Dense(30, activation="relu"))
+    model.add(Dropout(0.2))
+    model.add(Dense(30, activation="relu"))
+    model.add(Dropout(0.2))
+    model.add(Dense(30, activation="relu"))
+    model.add(Dropout(0.2))
+    model.add(Dense(30, activation="relu"))
+    model.add(Dropout(0.2))
+    model.add(Dense(40, activation="sigmoid"))
     model.add(Dropout(0.2))
     model.add(Dense(y_size))
     model.compile(loss='mean_squared_error',
         optimizer='nadam',
         metrics=['accuracy'])
     return model
-predictor   = model(5,1)
-history     = predictor.fit(X_train, y_train, batch_size = 1, epochs = 100)
+predictor   = model(2,1)
+history     = predictor.fit(X_train, y_train, batch_size = 20, epochs = 100)
 predictions = predictor.predict(X_test)
 
-predictor.save('predictor.h5')
+#predictor.save('not_so_simple_predictor.h5')
 ############################################ DISPLAYING THE RESULTS ##########################################
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
@@ -120,6 +128,13 @@ results = pd.DataFrame(data=predictions, columns=['predicted_fare'])
 results['actual_fare'] = y_test
 results['difference']  = results[['predicted_fare','actual_fare']].apply(
                                             lambda values: (values[0]-values[1]), axis=1)
+### Score
+from sklearn.metrics import mean_squared_error
+from math import sqrt
+
+predictions = predictor.predict(X_test)
+rms = sqrt(mean_squared_error(y_test, predictions))
+# Plots
 def plot_results(res):
     plt.scatter(res['actual_fare'],   res.index.values, marker = '1', color = '#1FD91F')
     plt.scatter(res['predicted_fare'],res.index.values, marker = '1', color = '#D91F1F')
@@ -146,7 +161,11 @@ def plot_error(difference):
     difference  = difference.apply(lambda values: abs(values))
     difference.sort_values()
     plt.plot(difference)
-def display_results(h, res):
+def plot_rmse(rms):
+    plt.subplot(GridSpec(2, 2)[1, 1])
+    plt.grid()
+    plt.scatter(rms,0)
+def display_results(h, res,rmse):
     plot_hist(h)
     plot_difference(res)
     r1 = len(results[results['difference']<= 0.01])
@@ -158,7 +177,12 @@ def display_results(h, res):
     #d  = abs(d-r)
     w = len(results)-r
     plot_accuracy([r,w])
-    plot_error(results['difference'])
+    #plot_error(results['difference'])
+    plot_rmse(rms)
     plt.show()
     return
-display_results(history.history, results)
+display_results(history.history, results, rms)
+
+### Load old model
+#from keras.models import load_model
+#predictor = load_model('not_so_simple_predictor.h5')
